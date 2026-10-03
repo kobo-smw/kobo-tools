@@ -1,0 +1,76 @@
+# Builds every tool for every platform, from the source archives of the
+# workflow run (the `sources` artifact) or of a release, runs each build
+# once, and uploads them as one artifact per platform.
+name: platforms
+
+on:
+  workflow_call:
+    inputs:
+      artifact-prefix:
+        type: string
+        required: true
+      release:
+        description: Take the sources from this release instead of the run's artifact.
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64
+            os: ubuntu-24.04
+          - platform: windows-x64
+            os: windows-2022
+          - platform: macos-arm64
+            os: macos-15
+          - platform: macos-x64
+            os: macos-15-intel
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sources from this run
+        if: inputs.release == ''
+        uses: actions/download-artifact@v4
+        with:
+          name: sources
+          path: dist
+      - name: Sources from ${{ inputs.release }}
+        if: inputs.release != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "${{ inputs.release }}" --repo "$GITHUB_REPOSITORY" -p '*-source.tar.gz' -D dist
+      # Linux builds in the pinned image (pins.LINUX_IMAGE), as anyone can.
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          image=$(python3 -c 'import pins; print(pins.LINUX_IMAGE)')
+          docker run --rm -v "$PWD:/w" -w /w "$image" ci/linux-build.sh
+          sudo chown -R "$(id -u):$(id -g)" dist
+      - name: .NET SDK
+        if: runner.os != 'Linux'
+        id: sdk
+        shell: bash
+        run: echo "version=$(python3 -c 'import pins; print(pins.DOTNET_SDK)')" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-dotnet@v4
+        if: runner.os != 'Linux'
+        with:
+          dotnet-version: ${{ steps.sdk.outputs.version }}
+      - name: Build
+        if: runner.os != 'Linux'
+        shell: bash
+        run: |
+          python3 build.py build asar pixi uberasm --platform ${{ matrix.platform }} --sources dist --out dist
+          python3 build.py test --platform ${{ matrix.platform }} dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact-prefix }}-${{ matrix.platform }}
+          path: dist/*-${{ matrix.platform }}.tar.gz
+          if-no-files-found: error

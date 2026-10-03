@@ -1,0 +1,90 @@
+# Rebuilds a release from its own source archives and compares each build
+# with the published one, file by file. The Linux builds are expected to
+# match; the others match only while the runner images keep the same
+# compilers (see the README), so their differences are reported, not
+# failed on, unless `strict` is set.
+name: verify
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: The release to verify (its tag).
+        required: true
+      strict:
+        description: Fail on any platform's difference, not only Linux's.
+        type: boolean
+        default: false
+  schedule:
+    # Monthly, against the latest release.
+    - cron: "17 4 3 * *"
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ inputs.release }}"
+          if [ -z "$tag" ]; then
+            tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName)
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  rebuild:
+    needs: release
+    uses: ./.github/workflows/platforms.yml
+    with:
+      artifact-prefix: rebuilt
+      release: ${{ needs.release.outputs.tag }}
+
+  compare:
+    needs: [release, rebuild]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: rebuilt-*
+          path: rebuilt
+          merge-multiple: true
+      - name: Compare
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.release.outputs.tag }}
+          STRICT: ${{ inputs.strict }}
+        run: |
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" -p '*.tar.gz' -D published
+          failed=0
+          {
+            echo "## $TAG rebuilt from its sources"
+            echo
+            echo "| build | published sha256 | rebuilt |"
+            echo "|---|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+          for rebuilt in rebuilt/*.tar.gz; do
+            name=$(basename "$rebuilt")
+            published="published/$name"
+            want=$(sha256sum "$published" | cut -d' ' -f1)
+            if cmp -s "$rebuilt" "$published"; then
+              result="identical"
+            elif python3 build.py compare "$published" "$rebuilt" > diff.txt; then
+              result="same files, different archive bytes"
+            else
+              result="differs: $(grep -c '^differs' diff.txt) files ($(grep '^differs' diff.txt | head -3 | cut -d' ' -f2 | tr '\n' ' '))"
+              case "$name" in
+                *-linux-*) failed=1 ;;
+                *) [ "$STRICT" = true ] && failed=1 ;;
+              esac
+            fi
+            echo "| $name | \`${want:0:16}\` | $result |" >> "$GITHUB_STEP_SUMMARY"
+            echo "$name: $result"
+          done
+          exit $failed

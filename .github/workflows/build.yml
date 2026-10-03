@@ -1,0 +1,62 @@
+# Builds every tool for every platform from the pinned sources, runs each
+# build once, and, for a tag, publishes them all as a release with their
+# sources, SHA256SUMS, and manifest.json.
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["r*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sources:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 build.py sources --out dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sources
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  build:
+    needs: sources
+    uses: ./.github/workflows/platforms.yml
+    with:
+      artifact-prefix: builds
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/r')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - run: python3 build.py manifest --release "$GITHUB_REF_NAME" dist
+      - run: python3 build.py pins dist/manifest.json > dist/kobo-pinned.toml
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "Builds of Asar, PIXI, and UberASM Tool for Kobo, from the upstream commits in manifest.json."
+            echo
+            echo "Each build's source is the \`-source.tar.gz\` of the same tool in this release; KOBO-TOOLS.txt in each archive says what it holds and how it was built. See the README for what is reproducible."
+            echo
+            echo '```'
+            cat dist/SHA256SUMS
+            echo '```'
+          } > notes.md
+          gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/manifest.json dist/SHA256SUMS dist/kobo-pinned.toml \
+            --title "$GITHUB_REF_NAME" --notes-file notes.md
