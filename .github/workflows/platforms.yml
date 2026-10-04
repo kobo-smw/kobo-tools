@@ -67,7 +67,7 @@ jobs:
         if: runner.os != 'Linux'
         shell: bash
         run: |
-          python3 build.py build asar pixi uberasm --platform ${{ matrix.platform }} --sources dist --out dist
+          python3 build.py build asar pixi pixi-1.42 uberasm --platform ${{ matrix.platform }} --sources dist --out dist
           python3 build.py test --platform ${{ matrix.platform }} dist
       - uses: actions/upload-artifact@v4
         with:

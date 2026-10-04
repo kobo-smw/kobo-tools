@@ -142,12 +142,18 @@ def extract(archive, into):
 # Sources ----------------------------------------------------------------
 
 
+def stem(tool):
+    """The name a tool's files start with: its key, or `stem` for a second
+    version of a tool (`pixi-1.42` is `pixi`)."""
+    return pins.TOOLS[tool].get("stem", tool)
+
+
 def source_name(tool):
-    return f"{tool}-{pins.TOOLS[tool]['version']}-source"
+    return f"{stem(tool)}-{pins.TOOLS[tool]['version']}-source"
 
 
 def build_name(tool, plat):
-    return f"{tool}-{pins.TOOLS[tool]['version']}-{plat}"
+    return f"{stem(tool)}-{pins.TOOLS[tool]['version']}-{plat}"
 
 
 def excluded(path, excludes):
@@ -429,8 +435,8 @@ class Builder:
     # PIXI: the program and the files its releases carry, without the CFG
     # editor, and without Asar's library, which goes beside it from the
     # Asar build.
-    def build_pixi(self):
-        source = self.unpack_source("pixi")
+    def build_pixi(self, tool="pixi"):
+        source = self.unpack_source(tool)
         asar = self.unpack_source("asar")
         deps = self.work / "pixi-deps"
         deps.mkdir(exist_ok=True)
@@ -452,14 +458,14 @@ class Builder:
                 f"-DFETCHCONTENT_SOURCE_DIR_JSON={deps / 'json'}",
             ],
         )
-        root = build_name("pixi", self.plat)
+        root = build_name(tool, self.plat)
         program = find_one(build, [exe("pixi")])
-        entries = self.licence_entries("pixi", source, root)
+        entries = self.licence_entries(tool, source, root)
         entries[f"{root}/{exe('pixi')}"] = (program.read_bytes(), True)
         entries.update(pixi_release_files(source, root))
         entries[f"{root}/KOBO-TOOLS.txt"] = (
             self.provenance(
-                "pixi",
+                tool,
                 [
                     f"{exe('pixi')}, and the files PIXI's own release zip carries (its zip.py),",
                     "  with the documentation as Markdown",
@@ -472,7 +478,7 @@ class Builder:
             ),
             False,
         )
-        self.package("pixi", entries)
+        self.package(tool, entries)
 
     # UberASM Tool: a self-contained x64 (or arm64) build with its files,
     # which loads Asar's native library from beside it.
@@ -635,7 +641,11 @@ def cmd_build(args):
     try:
         for tool in args.tools:
             builder = Builder(plat, args.sources, args.out, work / tool)
-            getattr(builder, f"build_{tool}")()
+            kind = pins.TOOLS[tool].get("builder", tool)
+            if kind == tool:
+                getattr(builder, f"build_{kind}")()
+            else:
+                getattr(builder, f"build_{kind}")(tool)
     finally:
         if not args.keep:
             shutil.rmtree(work, ignore_errors=True)
@@ -666,9 +676,12 @@ def cmd_test(args):
         if rom.read_bytes()[:4] != b"KOBO":
             raise SystemExit("Asar did not patch the image")
 
-        version = run([roots["pixi"] / exe("pixi"), "--version"], capture=True)
-        if pins.TOOLS["pixi"]["version"] not in version:
-            raise SystemExit(f"PIXI printed {version!r}")
+        for tool, pin in pins.TOOLS.items():
+            if pin.get("builder", tool) != "pixi":
+                continue
+            version = run([roots[tool] / exe("pixi"), "--version"], capture=True)
+            if pin["version"] not in version:
+                raise SystemExit(f"PIXI {pin['version']} printed {version!r}")
 
         if plat.startswith("linux"):
             check_glibc(roots.values())
@@ -772,9 +785,11 @@ def cmd_pins(args):
         f'url = "{manifest["url"]}"',
     ]
     for tool, entry in manifest["tools"].items():
+        # A key with a dot (pixi-1.42) is quoted.
+        key = f'"{tool}"' if "." in tool else tool
         lines += [
             "",
-            f"[tools.{tool}]",
+            f"[tools.{key}]",
             f'name = "{entry["name"]}"',
             f'version = "{entry["version"]}"',
             f'licence = "{entry["licence"]}"',
@@ -783,7 +798,7 @@ def cmd_pins(args):
         for plat, build in entry["builds"].items():
             lines += [
                 "",
-                f"[tools.{tool}.builds.{plat}]",
+                f"[tools.{key}.builds.{plat}]",
                 f'file = "{build["file"]}"',
                 f'sha256 = "{build["sha256"]}"',
                 f"size = {build['size']}",

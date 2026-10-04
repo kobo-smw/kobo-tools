@@ -6,5 +6,5 @@ set -eu
 cd "$(dirname "$0")/.."
 ci/linux-deps.sh
 git config --global --add safe.directory '*'
-python3 build.py build asar pixi uberasm --platform linux-x64 --sources dist --out dist
+python3 build.py build asar pixi pixi-1.42 uberasm --platform linux-x64 --sources dist --out dist
 python3 build.py test --platform linux-x64 dist

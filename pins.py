@@ -49,6 +49,30 @@ TOOLS = {
             }
         ],
     },
+    # The PIXI the Romhack Races baserom's sprites are written for: a
+    # project pins it with `[pixi] version = "1.42"`. Built as 1.43 is.
+    "pixi-1.42": {
+        "name": "PIXI",
+        "version": "1.42",
+        "stem": "pixi",
+        "builder": "pixi",
+        "licence": "GPL-3.0",
+        "repository": "https://github.com/JackTheSpades/SpriteToolSuperDelux",
+        "tag": "1.42",
+        "commit": "034313b857c598cc3ccc2c991134d0dcd6975992",
+        "licence_files": ["LICENSE"],
+        "exclude": ["src/CFG Editor"],
+        "dependencies": [
+            {
+                "name": "nlohmann/json",
+                "version": "3.11.3",
+                "licence": "MIT",
+                "url": "https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz",
+                "sha256": "d6c65aca6b1ed68e7a182f4757257b107ae403032760ed6ef121c9d55e81757d",
+                "file": "json.tar.xz",
+            }
+        ],
+    },
     "uberasm": {
         "name": "UberASM Tool",
         "version": "2.1",

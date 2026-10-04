@@ -6,11 +6,13 @@ upstream commits on CI and published as releases with their sources:
 | Tool | Version | Licence | Upstream |
 |---|---|---|---|
 | Asar (program and shared library) | 1.91 | LGPL-3.0-or-later | [RPGHacker/asar](https://github.com/RPGHacker/asar) |
-| PIXI | 1.43 | GPL-3.0 | [JackTheSpades/SpriteToolSuperDelux](https://github.com/JackTheSpades/SpriteToolSuperDelux) |
+| PIXI | 1.43, and 1.42 | GPL-3.0 | [JackTheSpades/SpriteToolSuperDelux](https://github.com/JackTheSpades/SpriteToolSuperDelux) |
 | UberASM Tool | 2.1 | GPL-3.0 | [Fernap/UberASMTool](https://github.com/Fernap/UberASMTool) |
 
 for `linux-x64`, `windows-x64`, `macos-arm64`, and `macos-x64`. The commits, and everything
-else a build depends on, are in [`pins.py`](pins.py).
+else a build depends on, are in [`pins.py`](pins.py). PIXI 1.43 is the one Kobo uses by
+default; 1.42 (`pixi-1.42`, from `r2`) is for projects whose sprites are written for it, the
+Romhack Races baserom's among them.
 
 Kobo downloads the build for its platform on first use, checks it against the SHA-256 it
 pins, and caches it. Anyone else can use them too: each is a `.tar.gz` of one folder.
@@ -49,7 +51,7 @@ The builds differ from upstream's releases in these ways, and only these:
 
 ```sh
 python3 build.py sources --out dist        # needs git and the network
-python3 build.py build asar pixi uberasm --sources dist --out dist
+python3 build.py build asar pixi pixi-1.42 uberasm --sources dist --out dist
 python3 build.py test dist
 ```
 
