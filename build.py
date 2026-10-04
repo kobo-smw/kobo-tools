@@ -215,6 +215,14 @@ def make_source(tool, out, work):
             left_out.append(path)
         else:
             entries[f"{prefix}/{path}"] = entry
+    for backport in pin.get("backports", []):
+        for edit in backport["edits"]:
+            key = f"{prefix}/{edit['file']}"
+            data, executable = entries[key]
+            text = data.decode()
+            if text.count(edit["from"]) != 1:
+                raise SystemExit(f"{tool}: backport {backport['commit'][:7]} does not apply to {edit['file']}")
+            entries[key] = (text.replace(edit["from"], edit["to"]).encode(), executable)
     deps = pin.get("dependencies", [])
     for dep in deps:
         if "url" in dep:
@@ -232,13 +240,19 @@ def make_source(tool, out, work):
         f"Tag {pin['tag']}, commit {pin['commit']}.",
         f"Licence: {pin['licence']}.",
         "",
-        "This is upstream's tree at that commit, unchanged,",
+        "This is upstream's tree at that commit"
+        + ("," if pin.get("backports") else ", unchanged,"),
     ]
     if pin["exclude"]:
         notes.append("less these, which are neither built nor published:")
         for e in pin["exclude"]:
             count = sum(1 for f in left_out if excluded(f, [e]))
             notes.append(f"  {e} ({count} file{'' if count == 1 else 's'})")
+    if pin.get("backports"):
+        notes.append("with these commits of upstream's, made after the tag, applied:")
+        for b in pin["backports"]:
+            files = sorted({e["file"] for e in b["edits"]})
+            notes.append(f"  {b['commit']} ({b['title']}): {', '.join(files)}")
     if deps:
         notes.append("with, in kobo-tools/deps, the source of what the build takes in:")
         for d in deps:

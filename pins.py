@@ -62,6 +62,27 @@ TOOLS = {
         "commit": "034313b857c598cc3ccc2c991134d0dcd6975992",
         "licence_files": ["LICENSE"],
         "exclude": ["src/CFG Editor"],
+        # 1.42 does not compile with Apple's C++ library; upstream's own fix,
+        # after the tag, changes nothing PIXI does. Applied to the source
+        # archive, line for line.
+        "backports": [
+            {
+                "commit": "e85673f145ddedc381c3665807ea9bd7ba03b494",
+                "title": "Fix compiler errors on macos",
+                "edits": [
+                    {
+                        "file": "src/sprite.cpp",
+                        "from": '    sprintf(to_write, "Pixi v%d.%d\\t", VERSION_MAJOR, VERSION_PARTIAL);',
+                        "to": '    snprintf(to_write, sizeof(to_write), "Pixi v%d.%d\\t", VERSION_MAJOR, VERSION_PARTIAL);',
+                    },
+                    {
+                        "file": "src/sprite.cpp",
+                        "from": "            for (auto& path_part : rel.replace_extension()) {",
+                        "to": "            for (const auto& path_part : rel.replace_extension()) {",
+                    },
+                ],
+            }
+        ],
         "dependencies": [
             {
                 "name": "nlohmann/json",

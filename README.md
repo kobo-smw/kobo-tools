@@ -38,6 +38,10 @@ The builds differ from upstream's releases in these ways, and only these:
   Nintendo's graphics, palettes, and a Map16 page; the editor's folder is left out of the
   source archive too. The rest of PIXI's release (its `asm/`, sprite, and routine folders,
   `list.txt`) is as its own `zip.py` packs it, with the documents as Markdown.
+- **PIXI 1.42** has upstream's commit `e85673f` ("Fix compiler errors on macos", made after
+  the 1.42 tag) applied to its source archive, without which it does not compile with
+  Apple's C++ library: two lines of `src/sprite.cpp`, a `const` reference and `snprintf`
+  for `sprintf`. What PIXI does is unchanged.
 - **UberASM Tool** is published for x64 (arm64 on Apple silicon) instead of 32-bit Windows,
   self-contained, so it needs no .NET installed, and without the 32-bit `asar.dll` its
   repository carries. Its source is unchanged; `build.py` gives `dotnet publish` the
