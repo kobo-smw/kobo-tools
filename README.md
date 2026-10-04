@@ -92,7 +92,7 @@ timestamp. What the builds inside depend on:
 `.github/workflows/verify.yml` rebuilds a release from its own source archives and compares
 every build with the published one, file by file: monthly against the latest release, or on
 demand. A Linux difference fails it; other platforms' differences are reported. For `r1`
-(2026-09-27) every one of the twelve builds came out byte-identical.
+(2026-10-03) every one of the twelve builds came out byte-identical.
 
 ## Licence
 
